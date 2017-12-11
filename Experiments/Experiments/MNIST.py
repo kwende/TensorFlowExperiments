@@ -11,7 +11,7 @@ IMAGE_SIZE = IMAGE_DIM * IMAGE_DIM
 hidden1_size = 100
 hidden2_size = 30
 output_size = 10
-batch_size = 1
+batch_size = 100
 
 imagePixelsPlaceholder = tf.placeholder(dtype=tf.float32, shape=[batch_size, 784])
 labelsPlaceholder = tf.placeholder(dtype=tf.int32, shape=[batch_size])
@@ -31,35 +31,27 @@ outputWeights = tf.Variable(tf.truncated_normal([hidden2_size, output_size], std
 outputBias = tf.Variable(tf.zeros(output_size))
 output = tf.matmul(hidden2, outputWeights) + outputBias
 
-# identify the loss function. 
+# identify the loss function.
 crossEntropy = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=tf.to_int64(labelsPlaceholder), logits=output)
 lossFunction = tf.reduce_mean(crossEntropy)
 
-# create the learner (or optimizer) against the loss function. 
+# create the learner (or optimizer) against the loss function.
 optimizer = tf.train.GradientDescentOptimizer(.01)
 trainer = optimizer.minimize(lossFunction)
 
-# initialize the variables. 
+# initialize the variables.
 init = tf.global_variables_initializer()
 
 mnistData = input_data.read_data_sets("MNIST_data/")
-
-pixels = np.reshape(mnistData.train.images[0], [1, 784])
-labels =  [mnistData.train.labels[0]]
 
 session = tf.Session()
 session.run(init)
 
 for step in range(0, 1000):
-    ret = session.run([trainer, lossFunction], feed_dict = {imagePixelsPlaceholder:pixels, labelsPlaceholder:labels})
-    print(ret[1])
 
+    images, labels = mnistData.test.next_batch(batch_size)
 
-#pixels = np.reshape(mnistData.train.images[0], [1, 784])
-#labels =  [mnistData.train.labels[0]]
+    ret = session.run([trainer, lossFunction], feed_dict = {imagePixelsPlaceholder:images, labelsPlaceholder:labels})
+    print("Loss: " + ret[1])
 
-#print(session.run(output, {imagePixelsPlaceholder : pixels,
-#                     labelsPlaceholder : tf.to_int64(labels), }))
-
-print()
 
