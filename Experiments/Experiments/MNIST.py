@@ -47,11 +47,26 @@ mnistData = input_data.read_data_sets("MNIST_data/")
 session = tf.Session()
 session.run(init)
 
-for step in range(0, 1000):
+for step in range(0, 2000):
 
-    images, labels = mnistData.test.next_batch(batch_size)
+    images, labels = mnistData.train.next_batch(batch_size)
 
     ret = session.run([trainer, lossFunction], feed_dict = {imagePixelsPlaceholder:images, labelsPlaceholder:labels})
-    print("Loss: " + ret[1])
+    print("Loss: " + str(ret[1]))
+
+testOutputPlaceholder = tf.placeholder(dtype=tf.float32, shape=[batch_size, 10])
+testLabelPlaceholder = tf.placeholder(dtype=tf.int32, shape=[batch_size])
+
+aMax = tf.argmax(testOutputPlaceholder, 1)
+equalityMeasure = tf.equal(aMax, tf.to_int64(testLabelPlaceholder))
+asInt = tf.to_int32(equalityMeasure)
+meanAccuracy = tf.reduce_mean(asInt, 0)
+
+images, labels = mnistData.test.next_batch(batch_size)
+output = session.run([output], feed_dict={imagePixelsPlaceholder : images})
+
+test = session.run([meanAccuracy, aMax, equalityMeasure, asInt], feed_dict={testOutputPlaceholder : output[0], testLabelPlaceholder : labels})
+
+print(str(np.mean(test[3])))
 
 
