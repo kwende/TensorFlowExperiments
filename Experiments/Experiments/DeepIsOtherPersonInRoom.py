@@ -3,44 +3,6 @@ import numpy as np
 from tensorflow.examples.tutorials.mnist import input_data
 from tensorflow.examples.tutorials.mnist import mnist
 import math
-import json
-import os
-import sys
-import ijson
-
-def getObject(path):
-    with open(path) as f:
-        return np.array(json.load(f))
-
-def readTrainingData(dir, maxSize):
-
-    positivesDirectory = os.path.join(dir, "positives")
-    negativesDirectory = os.path.join(dir, "negatives")
-
-    labels = []
-    ret = []
-
-    i = 1
-    files = os.listdir(positivesDirectory)[:maxSize]
-    for file in files:
-        print(str(i) + "/" + str(len(files)))
-        ret.append(getObject(os.path.join(positivesDirectory, file)))
-        labels.append(np.array([1]))
-        i = i + 1
-
-    files = os.listdir(negativesDirectory)[:maxSize]
-    i = 1
-    for file in files:
-        print(str(i) + "/" + str(len(files)))
-        ret.append(getObject(os.path.join(negativesDirectory, file)))
-        labels.append(np.array([0]))
-        i = i + 1
-
-    ret = {}
-    ret["DATA"] = np.array(ret)
-    ret["LABELS"] = np.array(labels)
-
-    return ret
 
 # create a weight that's a normal distribution about 0 w/ stdev of .1
 def createWeight(shape):
@@ -58,51 +20,43 @@ def conv2d(x, W):
     return tf.nn.conv2d(x, W, strides = [1, 1, 1, 1], padding = "SAME")
 
 # max pooling.
-def max_pooling(x, poolSize):
-    return tf.nn.max_pool(x, ksize=[1, poolSize, poolSize, 1], strides=[1, poolSize, poolSize, 1], padding="SAME")
+def max_pool_2x2(x):
+    return tf.nn.max_pool(x, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding="SAME")
 
-batchSize = 4
-frameWidth = 256
-frameHeight = 212
-frameSize = frameWidth * frameHeight
-outputNeuronCount = 1
-poolSize = 4
+batchSize = 100
 
-trainingData = readTrainingData("D:/cnnData/training_justjson", 5)
+_x = tf.placeholder(dtype = tf.float32, shape = [batchSize, 784])
+_labels = tf.placeholder(dtype=tf.int32, shape=[batchSize, 10])
 
-_x = tf.placeholder(dtype = tf.float32, shape = [batchSize, frameSize])
-_labels = tf.placeholder(dtype=tf.int32, shape=[batchSize, outputNeuronCount])
-
-W_conv1 = createWeight([25, 25, 1, 32])
+W_conv1 = createWeight([5, 5, 1, 32])
 b_conv1 = createBias([32])
 
-reformatedImaged = tf.reshape(_x, [-1, frameWidth, frameHeight, 1])
+reformatedImaged = tf.reshape(_x, [-1, 28, 28, 1])
 
 conv1Handle = tf.nn.relu(conv2d(reformatedImaged, W_conv1) + b_conv1)
-pool1Handle = max_pooling(conv1Handle, poolSize)
+pool1Handle = max_pool_2x2(conv1Handle)
 
-W_conv2 = createWeight([25, 25, 32, 64])
+W_conv2 = createWeight([5, 5, 32, 64])
 b_conv1 = createBias([64])
 
 conv2Handle = tf.nn.relu(conv2d(pool1Handle, W_conv2) + b_conv1)
-pool2Handle = max_pooling(conv2Handle, poolSize)
+pool2Handle = max_pool_2x2(conv2Handle)
 
-newWidth = int(math.ceil(frameWidth / (poolSize * poolSize)))
-newHeight =  int(math.ceil(frameHeight / (poolSize * poolSize)))
-
-W_fc1 = createWeight([newHeight * newWidth * 64, 1024])
+W_fc1 = createWeight([7 * 7 * 64, 1024])
 b_fc1 = createBias([1024])
 
-pool2FlatLayer = tf.reshape(pool2Handle, [-1, newHeight * newWidth * 64])
+pool2FlatLayer = tf.reshape(pool2Handle, [-1, 7 * 7 * 64])
 fullyConnectedLayerHandle = tf.nn.relu(tf.matmul(pool2FlatLayer, W_fc1) + b_fc1)
 
 probOfDropout = tf.placeholder(dtype=tf.float32)
 handleDropoutLayer = tf.nn.dropout(fullyConnectedLayerHandle, probOfDropout)
 
-W_output = createWeight([1024, 1])
-b_output = createBias([1])
+W_output = createWeight([1024, 10])
+b_output = createBias([10])
 
 handleOfOutputLayer = tf.matmul(handleDropoutLayer, W_output) + b_output
+
+mnistData = input_data.read_data_sets("MNIST_data/", one_hot=True)
 
 with tf.Session() as session:
     session.run(tf.global_variables_initializer())
