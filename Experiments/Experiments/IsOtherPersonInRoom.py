@@ -12,19 +12,32 @@ def getObject(path):
     with open(path) as f:
         return np.array(json.load(f))
 
+#https://stackoverflow.com/questions/40994583/how-to-implement-tensorflows-next-batch-for-own-data
+def next_batch(num, data, labels):
+    '''
+    Return a total of `num` random samples and labels. 
+    '''
+    idx = np.arange(0 , len(data))
+    np.random.shuffle(idx)
+    idx = idx[:num]
+    data_shuffle = [data[i] for i in idx]
+    labels_shuffle = [labels[i] for i in idx]
+
+    return np.asarray(data_shuffle), np.asarray(labels_shuffle)
+
 def readTrainingData(dir, maxSize):
 
     positivesDirectory = os.path.join(dir, "positives")
     negativesDirectory = os.path.join(dir, "negatives")
 
     labels = []
-    ret = []
+    data = []
 
     i = 1
     files = os.listdir(positivesDirectory)[:maxSize]
     for file in files:
         print(str(i) + "/" + str(len(files)))
-        ret.append(getObject(os.path.join(positivesDirectory, file)))
+        data.append(getObject(os.path.join(positivesDirectory, file)))
         labels.append(np.array([1]))
         i = i + 1
 
@@ -32,15 +45,15 @@ def readTrainingData(dir, maxSize):
     i = 1
     for file in files:
         print(str(i) + "/" + str(len(files)))
-        ret.append(getObject(os.path.join(negativesDirectory, file)))
+        data.append(getObject(os.path.join(negativesDirectory, file)))
         labels.append(np.array([0]))
         i = i + 1
 
-    ret = {}
-    ret["DATA"] = np.array(ret)
-    ret["LABELS"] = np.array(labels)
+    dict = {}
+    dict["DATA"] = np.array(data)
+    dict["LABELS"] = np.array(labels)
 
-    return ret
+    return dict
 
 # create a weight that's a normal distribution about 0 w/ stdev of .1
 def createWeight(shape):
@@ -68,7 +81,7 @@ frameSize = frameWidth * frameHeight
 outputNeuronCount = 1
 poolSize = 4
 
-trainingData = readTrainingData("D:/cnnData/training_justjson", 5)
+trainingData = readTrainingData("D:/cnnData/training_justjson", 100)
 
 _x = tf.placeholder(dtype = tf.float32, shape = [batchSize, frameSize])
 _labels = tf.placeholder(dtype=tf.int32, shape=[batchSize, outputNeuronCount])
@@ -88,7 +101,7 @@ conv2Handle = tf.nn.relu(conv2d(pool1Handle, W_conv2) + b_conv1)
 pool2Handle = max_pooling(conv2Handle, poolSize)
 
 newWidth = int(math.ceil(frameWidth / (poolSize * poolSize)))
-newHeight =  int(math.ceil(frameHeight / (poolSize * poolSize)))
+newHeight = int(math.ceil(frameHeight / (poolSize * poolSize)))
 
 W_fc1 = createWeight([newHeight * newWidth * 64, 1024])
 b_fc1 = createBias([1024])
@@ -115,7 +128,7 @@ with tf.Session() as session:
     accuracy = tf.reduce_mean(correctArrayAsInt)
 
     for i in range(0, 20000):
-        batch = mnistData.train.next_batch(batchSize)
+        batch = next_batch(batchSize, trainingData["DATA"], trainingData["LABELS"])
         trainer.run(feed_dict = {_x: batch[0], _labels: batch[1], probOfDropout: .5})
 
         if i % 100 == 0:
