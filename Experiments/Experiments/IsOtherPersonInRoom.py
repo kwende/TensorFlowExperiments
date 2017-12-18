@@ -147,6 +147,8 @@ b_output = createBias([outputNeuronCount])
 
 handleOfOutputLayer = tf.matmul(handleDropoutLayer, W_output) + b_output
 
+saver = tf.train.Saver()
+
 with tf.Session() as session:
     session.run(tf.global_variables_initializer())
 
@@ -165,4 +167,6 @@ with tf.Session() as session:
         validationBatch = next_batch(batchSize, trainingData["VALIDATION_DATA"], trainingData["VALIDATION_LABELS"])
         result = accuracy.eval(feed_dict={_x:validationBatch[0], _labels:validationBatch[1], probOfDropout: 1.0})
         print('step %d, training accuracy %g' % (i, result))
+
+        saver.save("C:/users/brush/desktop/checkPoint.ckpt")
 
