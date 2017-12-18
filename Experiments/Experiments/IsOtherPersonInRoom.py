@@ -25,33 +25,63 @@ def next_batch(num, data, labels):
 
     return np.asarray(data_shuffle), np.asarray(labels_shuffle)
 
-def readTrainingData(dir, maxSize):
+def readTrainingData(dir, maxSize, percentageOfDataIsValidation):
 
     positivesDirectory = os.path.join(dir, "positives")
     negativesDirectory = os.path.join(dir, "negatives")
 
-    labels = []
-    data = []
+    trainingDataLabels = []
+    trainingData = []
+
+    validationDataLabels = []
+    validationData = []
 
     i = 1
-    files = os.listdir(positivesDirectory)[:maxSize]
+    files = None
+    if maxSize > 0:
+        files = os.listdir(positivesDirectory)[:maxSize]
+    else:
+        files = os.listdir(positivesDirectory)
+
     for file in files:
-        print(str(i) + "/" + str(len(files)))
-        data.append(getObject(os.path.join(positivesDirectory, file)))
-        labels.append(np.array([1]))
+        if i % 100 == 0:
+            print(str(i) + "/" + str(len(files)))
+
+        if np.random.random_sample() <= percentageOfDataIsValidation:
+            validationData.append(getObject(os.path.join(positivesDirectory, file)))
+            validationDataLabels.append(np.array([1, 0]))
+        else:
+            trainingData.append(getObject(os.path.join(positivesDirectory, file)))
+            trainingDataLabels.append(np.array([1, 0]))
+
         i = i + 1
 
-    files = os.listdir(negativesDirectory)[:maxSize]
+    files = None
+    if maxSize > 0:
+        files = os.listdir(negativesDirectory)[:maxSize]
+    else:
+        files = os.listdir(negativesDirectory)
+
     i = 1
     for file in files:
-        print(str(i) + "/" + str(len(files)))
-        data.append(getObject(os.path.join(negativesDirectory, file)))
-        labels.append(np.array([0]))
+        if i % 100 == 0:
+            print(str(i) + "/" + str(len(files)))
+
+        if np.random.random_sample() <= percentageOfDataIsValidation:
+            validationData.append(getObject(os.path.join(negativesDirectory, file)))
+            validationDataLabels.append(np.array([0, 1]))
+        else:
+            trainingData.append(getObject(os.path.join(negativesDirectory, file)))
+            trainingDataLabels.append(np.array([0, 1]))
+
         i = i + 1
 
     dict = {}
-    dict["DATA"] = np.array(data)
-    dict["LABELS"] = np.array(labels)
+    dict["TRAINING_DATA"] = np.array(trainingData)
+    dict["TRAINING_LABELS"] = np.array(trainingDataLabels)
+
+    dict["VALIDATION_DATA"] = np.array(validationData)
+    dict["VALIDATION_LABELS"] = np.array(validationDataLabels)
 
     return dict
 
@@ -78,10 +108,10 @@ batchSize = 4
 frameWidth = 256
 frameHeight = 212
 frameSize = frameWidth * frameHeight
-outputNeuronCount = 1
+outputNeuronCount = 2
 poolSize = 4
 
-trainingData = readTrainingData("D:/cnnData/training_justjson", 100)
+trainingData = readTrainingData("D:/cnnData/training_justjson", .1)
 
 _x = tf.placeholder(dtype = tf.float32, shape = [batchSize, frameSize])
 _labels = tf.placeholder(dtype=tf.int32, shape=[batchSize, outputNeuronCount])
@@ -112,8 +142,8 @@ fullyConnectedLayerHandle = tf.nn.relu(tf.matmul(pool2FlatLayer, W_fc1) + b_fc1)
 probOfDropout = tf.placeholder(dtype=tf.float32)
 handleDropoutLayer = tf.nn.dropout(fullyConnectedLayerHandle, probOfDropout)
 
-W_output = createWeight([1024, 1])
-b_output = createBias([1])
+W_output = createWeight([1024, outputNeuronCount])
+b_output = createBias([outputNeuronCount])
 
 handleOfOutputLayer = tf.matmul(handleDropoutLayer, W_output) + b_output
 
@@ -128,11 +158,11 @@ with tf.Session() as session:
     accuracy = tf.reduce_mean(correctArrayAsInt)
 
     for i in range(0, 20000):
-        batch = next_batch(batchSize, trainingData["DATA"], trainingData["LABELS"])
+        batch = next_batch(batchSize, trainingData["TRAINING_DATA"], trainingData["TRAINING_LABELS"])
         trainer.run(feed_dict = {_x: batch[0], _labels: batch[1], probOfDropout: .5})
 
-        if i % 100 == 0:
-            train_accuracy = accuracy.eval(feed_dict={
-                _x: batch[0], _labels: batch[1], probOfDropout: 1.0})
-            print('step %d, training accuracy %g' % (i, train_accuracy))
+        #if i % 100 == 0:
+        validationBatch = next_batch(batchSize, trainingData["VALIDATION_DATA"], trainingData["VALIDATION_LABELS"])
+        result = accuracy.eval(feed_dict={_x:validationBatch[0], _labels:validationBatch[1], probOfDropout: 1.0})
+        print('step %d, training accuracy %g' % (i, result))
 
