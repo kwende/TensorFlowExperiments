@@ -169,9 +169,16 @@ with tf.Session() as session:
             for _ in range(0, rangeCount):
                 validationBatch = next_batch(batchSize, trainingData["VALIDATION_DATA"], trainingData["VALIDATION_LABELS"])
                 result = result + accuracy.eval(feed_dict={_x:validationBatch[0], _labels:validationBatch[1], probOfDropout: 1.0})
-            print('step %d, training accuracy %g' % (i, result / (rangeCount * 1.0)))
+
+            averageAccuracy = result / (rangeCount * 1.0)
+            print('step %d, training accuracy %g' % (i, averageAccuracy))
+
+            with open("c:/users/brush/desktop/deepLearning/results.csv", "a") as results:
+                results.write(str(averageAccuracy) + "\n")
         else:
             print("step %d" % (i))
 
-        saver.save(session, "C:/users/brush/desktop/checkPoint.ckpt")
+        print("\tSaving model...")
+        saver.save(session, "C:/users/brush/desktop/deepLearning/checkPoint.ckpt")
+        print("\tDone")
 
