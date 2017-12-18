@@ -104,7 +104,7 @@ def conv2d(x, W):
 def max_pooling(x, poolSize):
     return tf.nn.max_pool(x, ksize=[1, poolSize, poolSize, 1], strides=[1, poolSize, poolSize, 1], padding="SAME")
 
-batchSize = 4
+batchSize = 25
 frameWidth = 256
 frameHeight = 212
 frameSize = frameWidth * frameHeight
@@ -168,5 +168,5 @@ with tf.Session() as session:
         result = accuracy.eval(feed_dict={_x:validationBatch[0], _labels:validationBatch[1], probOfDropout: 1.0})
         print('step %d, training accuracy %g' % (i, result))
 
-        saver.save("C:/users/brush/desktop/checkPoint.ckpt")
+        saver.save(session, "C:/users/brush/desktop/checkPoint.ckpt")
 
