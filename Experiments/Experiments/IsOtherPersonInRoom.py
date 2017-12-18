@@ -111,7 +111,7 @@ frameSize = frameWidth * frameHeight
 outputNeuronCount = 2
 poolSize = 4
 
-trainingData = readTrainingData("D:/cnnData/training_justjson", .1)
+trainingData = readTrainingData("D:/cnnData/training_justjson", -1, .1)
 
 _x = tf.placeholder(dtype = tf.float32, shape = [batchSize, frameSize])
 _labels = tf.placeholder(dtype=tf.int32, shape=[batchSize, outputNeuronCount])
