@@ -124,7 +124,7 @@ reformatedImaged = tf.reshape(_x, [-1, frameWidth, frameHeight, 1])
 conv1Handle = tf.nn.relu(conv2d(reformatedImaged, W_conv1) + b_conv1)
 pool1Handle = max_pooling(conv1Handle, poolSize)
 
-W_conv2 = createWeight([25, 25, 32, 64])
+W_conv2 = createWeight([5, 5, 32, 64])
 b_conv1 = createBias([64])
 
 conv2Handle = tf.nn.relu(conv2d(pool1Handle, W_conv2) + b_conv1)
