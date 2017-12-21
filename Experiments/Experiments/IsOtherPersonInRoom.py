@@ -237,7 +237,5 @@ with tf.Session() as session:
         else:
             print("step %d" % (i))
 
-        print("\tSaving model...")
         saver.save(session, "C:/users/brush/desktop/deepLearning/checkPoint.ckpt")
-        print("\tDone")
 
