@@ -9,7 +9,6 @@ import sys
 import ijson
 import pickle
 
-
 def getObject(path):
     with open(path) as f:
         return np.array(json.load(f))
@@ -230,12 +229,14 @@ with tf.Session() as session:
 
             averageAccuracy = accuracy.eval(feed_dict={testingX:trainingData["VALIDATION_DATA"], 
                                                        testingLabels:trainingData["VALIDATION_LABELS"], testingDropoutProb: 1.0})
+            print()
             print('step %d, training accuracy %g' % (i, averageAccuracy))
 
             with open("c:/users/brush/desktop/deepLearning/results.csv", "a") as results:
                 results.write(str(averageAccuracy) + "\n")
         else:
-            print("step %d" % (i))
+            sys.stdout.write('.')
+            sys.stdout.flush()
 
         saver.save(session, "C:/users/brush/desktop/deepLearning/checkPoint.ckpt")
 
