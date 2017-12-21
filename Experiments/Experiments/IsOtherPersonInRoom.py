@@ -7,10 +7,13 @@ import json
 import os
 import sys
 import ijson
+import pickle
+
 
 def getObject(path):
     with open(path) as f:
         return np.array(json.load(f))
+        #return np.array([b/10000.0 for b in json.load(f)])
 
 #https://stackoverflow.com/questions/40994583/how-to-implement-tensorflows-next-batch-for-own-data
 def next_batch(num, data, labels):
@@ -39,42 +42,44 @@ def readTrainingData(dir, maxSize, percentageOfDataIsValidation):
     i = 1
     files = None
     if maxSize > 0:
-        files = os.listdir(positivesDirectory)[:maxSize]
+        files = [f for f in os.listdir(positivesDirectory)[:maxSize] if f.endswith(".json")]
     else:
-        files = os.listdir(positivesDirectory)
+        files = [f for f in os.listdir(positivesDirectory) if f.endswith(".json")]
+
 
     for file in files:
-        if i % 100 == 0:
-            print(str(i) + "/" + str(len(files)))
+        if file.endswith(".json"):
+            if i % 100 == 0:
+                print(str(i) + "/" + str(len(files)))
 
-        if np.random.random_sample() <= percentageOfDataIsValidation:
-            validationData.append(getObject(os.path.join(positivesDirectory, file)))
-            validationDataLabels.append(np.array([1, 0]))
-        else:
-            trainingData.append(getObject(os.path.join(positivesDirectory, file)))
-            trainingDataLabels.append(np.array([1, 0]))
+            if np.random.random_sample() <= percentageOfDataIsValidation:
+                validationData.append(getObject(os.path.join(positivesDirectory, file)))
+                validationDataLabels.append(np.array([1, 0]))
+            else:
+                trainingData.append(getObject(os.path.join(positivesDirectory, file)))
+                trainingDataLabels.append(np.array([1, 0]))
 
-        i = i + 1
+            i = i + 1
 
-    files = None
     if maxSize > 0:
-        files = os.listdir(negativesDirectory)[:maxSize]
+        files = [f for f in os.listdir(negativesDirectory)[:maxSize] if f.endswith(".json")]
     else:
-        files = os.listdir(negativesDirectory)
+        files = [f for f in os.listdir(negativesDirectory) if f.endswith(".json")]
 
     i = 1
     for file in files:
-        if i % 100 == 0:
-            print(str(i) + "/" + str(len(files)))
+        if file.endswith(".json"):
+            if i % 100 == 0:
+                print(str(i) + "/" + str(len(files)))
 
-        if np.random.random_sample() <= percentageOfDataIsValidation:
-            validationData.append(getObject(os.path.join(negativesDirectory, file)))
-            validationDataLabels.append(np.array([0, 1]))
-        else:
-            trainingData.append(getObject(os.path.join(negativesDirectory, file)))
-            trainingDataLabels.append(np.array([0, 1]))
+            if np.random.random_sample() <= percentageOfDataIsValidation:
+                validationData.append(getObject(os.path.join(negativesDirectory, file)))
+                validationDataLabels.append(np.array([0, 1]))
+            else:
+                trainingData.append(getObject(os.path.join(negativesDirectory, file)))
+                trainingDataLabels.append(np.array([0, 1]))
 
-        i = i + 1
+            i = i + 1
 
     dict = {}
     dict["TRAINING_DATA"] = np.array(trainingData)
@@ -86,7 +91,7 @@ def readTrainingData(dir, maxSize, percentageOfDataIsValidation):
     return dict
 
 # create a weight that's a normal distribution about 0 w/ stdev of .1
-def createWeight(shape):
+def createWeight(shape, name):
     weight = tf.truncated_normal(shape, stddev=.1)
     return tf.Variable(weight)
 
@@ -104,73 +109,127 @@ def conv2d(x, W):
 def max_pooling(x, poolSize):
     return tf.nn.max_pool(x, ksize=[1, poolSize, poolSize, 1], strides=[1, poolSize, poolSize, 1], padding="SAME")
 
-batchSize = 25
-frameWidth = 256
-frameHeight = 212
-frameSize = frameWidth * frameHeight
-outputNeuronCount = 2
-poolSize = 4
+def buildNetworkVariables(frameWidth, frameHeight, poolSize, outputNeuronCount):
+    varDict = {}
 
-trainingData = readTrainingData("D:/cnnData/training_justjson", -1, .1)
+    varDict["W_conv1"] = createWeight([5, 5, 1, 8], "Conv Layer 1")
+    varDict["b_conv1"] = createBias([8])
 
-_x = tf.placeholder(dtype = tf.float32, shape = [batchSize, frameSize])
-_labels = tf.placeholder(dtype=tf.int32, shape=[batchSize, outputNeuronCount])
+    varDict["W_conv2"] = createWeight([5, 5, 8, 16], "Conv Layer 2")
+    varDict["b_conv2"] = createBias([16])
 
-W_conv1 = createWeight([25, 25, 1, 32])
-b_conv1 = createBias([32])
+    varDict["W_conv3"] = createWeight([2, 2, 16, 32], "Conv Layer 3")
+    varDict["b_conv3"] = createBias([32])
 
-reformatedImaged = tf.reshape(_x, [-1, frameWidth, frameHeight, 1])
+    newWidth = int(math.ceil(frameWidth / (poolSize * poolSize / 2 * poolSize / 2)))
+    newHeight = int(math.ceil(frameHeight / (poolSize * poolSize / 2 * poolSize / 2)))
 
-conv1Handle = tf.nn.relu(conv2d(reformatedImaged, W_conv1) + b_conv1)
-pool1Handle = max_pooling(conv1Handle, poolSize)
+    varDict["W_fc1"] = createWeight([newHeight * newWidth * 32, 1024], "Fully connected layer")
+    varDict["b_fc1"] = createBias([1024])
 
-W_conv2 = createWeight([5, 5, 32, 64])
-b_conv1 = createBias([64])
+    varDict["W_output"] = createWeight([1024, outputNeuronCount], "Output layer")
+    varDict["b_output"] = createBias([outputNeuronCount])
 
-conv2Handle = tf.nn.relu(conv2d(pool1Handle, W_conv2) + b_conv1)
-pool2Handle = max_pooling(conv2Handle, poolSize)
+    return varDict
 
-newWidth = int(math.ceil(frameWidth / (poolSize * poolSize)))
-newHeight = int(math.ceil(frameHeight / (poolSize * poolSize)))
+#batchSize = 2
+#frameWidth = 256
+#frameHeight = 212
+#frameSize = frameWidth * frameHeight
+#outputNeuronCount = 2
+#poolSize = 4
+def buildNetwork(x, labels, probOfDropout, varDict, outputNeuronCount, frameWidth, frameHeight, poolSize, forTraining):
 
-W_fc1 = createWeight([newHeight * newWidth * 64, 1024])
-b_fc1 = createBias([1024])
+    reformatedImaged = tf.reshape(x, [-1, frameWidth, frameHeight, 1])
 
-pool2FlatLayer = tf.reshape(pool2Handle, [-1, newHeight * newWidth * 64])
-fullyConnectedLayerHandle = tf.nn.relu(tf.matmul(pool2FlatLayer, W_fc1) + b_fc1)
+    conv1Handle = tf.nn.relu(conv2d(reformatedImaged, varDict["W_conv1"]) + varDict["b_conv1"])
+    pool1Handle = max_pooling(conv1Handle, poolSize)
 
-probOfDropout = tf.placeholder(dtype=tf.float32)
-handleDropoutLayer = tf.nn.dropout(fullyConnectedLayerHandle, probOfDropout)
+    conv2Handle = tf.nn.relu(conv2d(pool1Handle, varDict["W_conv2"]) + varDict["b_conv2"])
+    pool2Handle = max_pooling(conv2Handle, poolSize / 2)
 
-W_output = createWeight([1024, outputNeuronCount])
-b_output = createBias([outputNeuronCount])
+    conv3Handle = tf.nn.relu(conv2d(pool2Handle, varDict["W_conv3"]) + varDict["b_conv3"])
+    pool3Handle = max_pooling(conv3Handle, poolSize / 2)
 
-handleOfOutputLayer = tf.matmul(handleDropoutLayer, W_output) + b_output
+    newWidth = int(math.ceil(frameWidth / (poolSize * poolSize / 2 * poolSize / 2)))
+    newHeight = int(math.ceil(frameHeight / (poolSize * poolSize / 2 * poolSize / 2)))
 
-saver = tf.train.Saver()
+    pool3FlatLayer = tf.reshape(pool3Handle, [-1, newHeight * newWidth * 32])
+    fullyConnectedLayerHandle = tf.nn.relu(tf.matmul(pool3FlatLayer, varDict["W_fc1"]) + varDict["b_fc1"])
 
+    handleDropoutLayer = tf.nn.dropout(fullyConnectedLayerHandle, probOfDropout)
+
+    handleOfOutputLayer = tf.matmul(handleDropoutLayer, varDict["W_output"]) + varDict["b_output"]
+
+    if forTraining:
+        loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels = labels, logits = handleOfOutputLayer))
+        trainer = tf.train.AdamOptimizer(1e-4).minimize(loss)
+        return trainer
+    else:
+        correctArray = tf.equal(tf.argmax(handleOfOutputLayer, 1), tf.argmax(labels, 1))
+        correctArrayAsInt = tf.to_float(correctArray)
+        accuracy = tf.reduce_mean(correctArrayAsInt)
+        return accuracy
+
+
+#pickle.dump(trainingData, open("D:/cnnData/training_justjson/data.pickle",
+#"wb"))
+
+#print("Loading data...")
+#trainingData = pickle.load(open("D:/cnnData/training_justjson/data.pickle",
+#"rb"))
+#print("...done")
 with tf.Session() as session:
+    trainingData = readTrainingData("D:/cnnData/training", -1, .1)
+
+    poolSize = 4
+    trainingBatchSize = 2
+    outputNeuronCount = 2
+    frameWidth = 256
+    frameHeight = 212
+    trainingBatchSize = 2
+
+    # build the variables to be used across the training and testing graphs
+    varDict = buildNetworkVariables(frameWidth, frameHeight, poolSize, outputNeuronCount)
+
+    frameSize = frameWidth * frameHeight
+
+    # create the training placeholders.
+    trainingX = tf.placeholder(dtype = tf.float32, shape = [trainingBatchSize, frameSize])
+    trainingLabels = tf.placeholder(dtype=tf.int32, shape= [trainingBatchSize, outputNeuronCount])
+    trainingDropoutProb = tf.placeholder(dtype=tf.float32)
+
+    # build the training graph
+    trainer = buildNetwork(trainingX, trainingLabels, trainingDropoutProb, varDict, 
+                           outputNeuronCount, frameWidth, frameHeight, poolSize, True)
+
+    # bulid the saver.
+    saver = tf.train.Saver()
+
+    # create the testing placeholders.
+    testingX = tf.placeholder(dtype = tf.float32, shape = [len(trainingData["VALIDATION_DATA"]), frameSize])
+    testingLabels = tf.placeholder(dtype=tf.int32, shape= [len(trainingData["VALIDATION_DATA"]), outputNeuronCount])
+    testingDropoutProb = tf.placeholder(dtype=tf.float32)
+
+    # build the testing graph
+    accuracy = buildNetwork(testingX, testingLabels, testingDropoutProb, varDict, 
+                            outputNeuronCount, frameWidth, frameHeight, poolSize, False)
+
     session.run(tf.global_variables_initializer())
 
-    loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels = _labels, logits = handleOfOutputLayer))
-    trainer = tf.train.AdamOptimizer(1e-4).minimize(loss)
+    writer = tf.summary.FileWriter("C:/users/brush/desktop/deepLearning/logs", session.graph)
+    writer.close()
+
     session.run(tf.initialize_all_variables())
-    correctArray = tf.equal(tf.argmax(handleOfOutputLayer, 1), tf.argmax(_labels, 1))
-    correctArrayAsInt = tf.to_float(correctArray)
-    accuracy = tf.reduce_mean(correctArrayAsInt)
 
     for i in range(0, 20000):
-        batch = next_batch(batchSize, trainingData["TRAINING_DATA"], trainingData["TRAINING_LABELS"])
-        trainer.run(feed_dict = {_x: batch[0], _labels: batch[1], probOfDropout: .5})
+        batch = next_batch(trainingBatchSize, trainingData["TRAINING_DATA"], trainingData["TRAINING_LABELS"])
+        trainer.run(feed_dict = {trainingX: batch[0], trainingLabels: batch[1], trainingDropoutProb: .5})
 
-        if i % 5 == 0:
-            result = 0
-            rangeCount = 10
-            for _ in range(0, rangeCount):
-                validationBatch = next_batch(batchSize, trainingData["VALIDATION_DATA"], trainingData["VALIDATION_LABELS"])
-                result = result + accuracy.eval(feed_dict={_x:validationBatch[0], _labels:validationBatch[1], probOfDropout: 1.0})
+        if i % 25 == 0:
 
-            averageAccuracy = result / (rangeCount * 1.0)
+            averageAccuracy = accuracy.eval(feed_dict={testingX:trainingData["VALIDATION_DATA"], 
+                                                       testingLabels:trainingData["VALIDATION_LABELS"], testingDropoutProb: 1.0})
             print('step %d, training accuracy %g' % (i, averageAccuracy))
 
             with open("c:/users/brush/desktop/deepLearning/results.csv", "a") as results:
