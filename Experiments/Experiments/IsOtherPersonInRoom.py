@@ -178,7 +178,7 @@ def buildNetwork(x, labels, probOfDropout, varDict, outputNeuronCount, frameWidt
 #trainingData = pickle.load(open("D:/cnnData/training_justjson/data.pickle",
 #"rb"))
 #print("...done")
-with tf.Session() as session:
+with tf.Session(config=tf.ConfigProto(log_device_placement=True)) as session:
     trainingData = readTrainingData("D:/cnnData/training", -1, .1)
 
     poolSize = 4
@@ -221,7 +221,7 @@ with tf.Session() as session:
 
     session.run(tf.initialize_all_variables())
 
-    for i in range(0, 20000):
+    for i in range(0, 200000):
         batch = next_batch(trainingBatchSize, trainingData["TRAINING_DATA"], trainingData["TRAINING_LABELS"])
         trainer.run(feed_dict = {trainingX: batch[0], trainingLabels: batch[1], trainingDropoutProb: .5})
 
